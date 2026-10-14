@@ -2,6 +2,9 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 
 import { env, getDatabaseConfig } from "../config/env";
+import { Category } from "../entities/Category";
+import { InventoryMovement } from "../entities/InventoryMovement";
+import { Product } from "../entities/Product";
 
 const databaseConfig = getDatabaseConfig();
 
@@ -14,10 +17,10 @@ export const dataSource = new DataSource({
   password: databaseConfig.password,
   synchronize: false,
   logging: false,
-  entities: [],
+  entities: [Category, Product, InventoryMovement],
   migrations: [],
   subscribers: [],
-  // Keep this explicit: schema creation belongs to a later phase.
+  // Keep schema changes explicit; database provisioning does not create tables.
   migrationsRun: false,
 });
 
