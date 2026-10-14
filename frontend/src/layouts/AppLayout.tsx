@@ -19,25 +19,18 @@ export function AppLayout() {
           <span className="badge text-bg-light border">MVP</span>
         </div>
       </header>
-
       <div className="container-fluid px-3 px-lg-4">
         <div className="row g-0">
           <aside className="col-12 col-lg-2 app-sidebar py-3 py-lg-4">
             <nav aria-label="Main navigation" className="nav nav-pills flex-row flex-lg-column gap-1">
               {navigation.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  className={({ isActive }) => `nav-link d-flex align-items-center gap-2 ${isActive ? 'active' : 'text-body-secondary'}`}
-                >
+                <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `nav-link d-flex align-items-center gap-2 ${isActive ? 'active' : 'text-body-secondary'}`}>
                   <i className={`bi ${item.icon}`} aria-hidden="true" />
                   <span>{item.label}</span>
                 </NavLink>
               ))}
             </nav>
           </aside>
-
           <main className="col-12 col-lg-10 app-main py-4 py-lg-5">
             <Outlet />
           </main>
