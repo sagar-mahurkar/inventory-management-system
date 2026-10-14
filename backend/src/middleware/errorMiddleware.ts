@@ -1,0 +1,42 @@
+import type { ErrorRequestHandler } from "express";
+import { AppError } from "./AppError";
+
+export const errorMiddleware: ErrorRequestHandler = (
+  err,
+  _req,
+  res,
+  _next,
+) => {
+  if (res.headersSent) {
+    return;
+  }
+
+  if (err instanceof SyntaxError && "body" in err) {
+    res.status(400).json({
+      error: {
+        code: "INVALID_JSON",
+        message: "Request body contains invalid JSON.",
+      },
+    });
+    return;
+  }
+
+  if (err instanceof AppError) {
+    res.status(err.statusCode).json({
+      error: {
+        code: err.code,
+        message: err.message,
+      },
+    });
+    return;
+  }
+
+  console.error("Unhandled request error:", err);
+
+  res.status(500).json({
+    error: {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "An unexpected error occurred.",
+    },
+  });
+};
