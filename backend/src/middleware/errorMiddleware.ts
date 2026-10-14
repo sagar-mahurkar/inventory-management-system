@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from "express";
+import { ZodError } from "zod";
 import { AppError } from "./AppError";
 
 export const errorMiddleware: ErrorRequestHandler = (
@@ -18,6 +19,20 @@ export const errorMiddleware: ErrorRequestHandler = (
       error: {
         code: "INVALID_JSON",
         message: "Request body contains invalid JSON.",
+      },
+    });
+    return;
+  }
+
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Request validation failed.",
+        details: err.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
       },
     });
     return;

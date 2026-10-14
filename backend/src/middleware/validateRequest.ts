@@ -1,0 +1,26 @@
+import type { RequestHandler } from "express";
+import type { ZodType } from "zod";
+
+export function validateBody(schema: ZodType): RequestHandler {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      next(result.error);
+      return;
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+export function validateQuery(schema: ZodType): RequestHandler {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      next(result.error);
+      return;
+    }
+    Object.assign(req.query, result.data);
+    next();
+  };
+}
