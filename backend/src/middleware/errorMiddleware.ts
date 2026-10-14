@@ -5,9 +5,11 @@ export const errorMiddleware: ErrorRequestHandler = (
   err,
   _req,
   res,
-  _next,
+  next,
 ) => {
+  // Delegate to Express's default error handler if headers were already sent.
   if (res.headersSent) {
+    next(err);
     return;
   }
 
