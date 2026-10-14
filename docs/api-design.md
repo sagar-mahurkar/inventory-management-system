@@ -52,6 +52,15 @@ Supported query parameters: `product_id`, `movement_type`, `limit`, and `offset`
 
 Stock updates and movement insertion execute in one database transaction. A product row is locked during the operation, and stock-out is rejected if the available balance is insufficient. Failed operations must not change stock or create a movement record.
 
+## Summary and aggregation
+
+| Method | Path | Purpose | Success |
+|---|---|---|---:|
+| GET | `/summary` | Return category/product counts, total units in stock, total inventory value, low-stock product count, and out-of-stock product count | 200 |
+| GET | `/summary/movements` | Return movement counts and total quantities for stock-in and stock-out | 200 |
+
+The summary endpoints are read-only. Aggregation queries are implemented in the repository layer and exposed through the service/controller layers. Counts and quantities are returned as numbers. `total_inventory_value` is returned as a decimal string to avoid JavaScript floating-point precision loss. Empty tables return zero-valued aggregates.
+
 ## Common status codes
 
 - `400` — invalid input or invalid category reference
