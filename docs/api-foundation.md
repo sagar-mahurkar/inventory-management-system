@@ -2,11 +2,11 @@
 
 ## Scope
 
-This document describes the API infrastructure for the Inventory Management System MVP. It does not introduce authentication or feature-specific endpoints.
+This document describes the HTTP/API infrastructure for the Inventory Management System MVP. Authentication and authorization are not part of the agreed MVP.
 
 ## Base path
 
-Versioned feature APIs are mounted under `/api/v1`. Feature routes will be registered through `backend/src/routes/index.ts` in later phases.
+Feature APIs are mounted under `/api/v1`.
 
 ## Health check
 
@@ -21,11 +21,11 @@ Versioned feature APIs are mounted under `/api/v1`. Feature routes will be regis
 }
 ```
 
-This endpoint reports that the HTTP application is responding. It is not a database-readiness check.
+This endpoint indicates that the HTTP application is responding. It is not a database-readiness check.
 
 ## Error response format
 
-Errors use this structure:
+Errors use the following structure:
 
 ```json
 {
@@ -45,15 +45,15 @@ The `code` and `message` values depend on the error.
 | Known application error | Defined by the error | Defined by the error |
 | Unexpected error | 500 | `INTERNAL_SERVER_ERROR` |
 
-Unexpected errors return a generic client-facing message; implementation details are logged server-side.
+Unexpected errors should return a generic client-facing message; implementation details belong in server-side logs.
 
 ## Middleware order
 
-The Express application applies security headers, CORS, JSON body parsing, the health route, versioned API routes, the not-found handler, and then the centralized error handler.
+The Express application applies security headers, CORS, JSON body parsing, the health route, versioned API routes, the not-found handler, and then the centralized error handler. Keep this order aligned with the implementation.
 
 ## Out of scope
 
 - User registration and login
 - JWT authentication
 - Roles and permissions
-- Inventory feature endpoints, which belong to later phases
+- Multi-tenant access control

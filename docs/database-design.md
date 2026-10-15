@@ -1,12 +1,12 @@
 # Inventory Management System — Database Design
 
-## 1. Design Status
+## 1. Design Summary
 
 - **Project classification:** Small MVP
-- **Proposed database:** PostgreSQL
+- **Database:** PostgreSQL
 - **Naming convention:** `snake_case` for database objects
-- **Scope:** One inventory catalogue; no warehouses, suppliers, orders, or user accounts in the MVP.
-- This design is the proposed source of truth for ORM models and schema setup. Update it if implementation reveals a requirement change.
+- **Scope:** One inventory catalogue; no warehouses, suppliers, orders, or user accounts.
+- This document records the intended data model and integrity rules. Keep it aligned with ORM models and schema/migration files.
 
 ## 2. Entities
 
@@ -26,7 +26,7 @@
 |---|---|---|
 | `id` | UUID | Primary key |
 | `category_id` | UUID | NOT NULL; FK to `categories.id` |
-| `sku` | VARCHAR(64) | NOT NULL, UNIQUE; stable stock-keeping identifier |
+| `sku` | VARCHAR(64) | NOT NULL, UNIQUE |
 | `name` | VARCHAR(160) | NOT NULL |
 | `description` | TEXT | NULL allowed |
 | `unit_price` | NUMERIC(12,2) | NOT NULL, CHECK >= 0 |
@@ -35,7 +35,7 @@
 | `created_at` | TIMESTAMPTZ | NOT NULL, default current timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, default current timestamp; updated on modification |
 
-`current_stock` is a cached/current balance maintained only by the stock movement service in the same transaction as movement creation. Do not expose it as an ordinary editable product field.
+`current_stock` is the current balance maintained by stock movement operations. It must not be an ordinary editable product field. Its update and movement record must be part of the same transaction.
 
 ### 2.3 `inventory_movements`
 
@@ -48,14 +48,14 @@
 | `note` | VARCHAR(500) | NULL allowed; reference/reason |
 | `created_at` | TIMESTAMPTZ | NOT NULL, default current timestamp |
 
-Each row represents a completed stock change. Quantity is always positive; `movement_type` determines whether it increases or decreases stock. The table is append-only through the MVP application.
+Each row represents a completed stock change. Quantity is always positive; `movement_type` determines the direction. The MVP application does not edit or delete movement history.
 
-## 3. Relationships and Cardinality
+## 3. Relationships
 
 - `categories` 1 — many `products`
 - `products` 1 — many `inventory_movements`
 
-A product must belong to one category. A movement must belong to one product.
+A product belongs to one category. A movement belongs to one product.
 
 ## 4. Constraints and Delete Behavior
 
@@ -64,17 +64,19 @@ A product must belong to one category. A movement must belong to one product.
 - `products.category_id` references `categories.id` with `ON DELETE RESTRICT`.
 - `inventory_movements.product_id` references `products.id` with `ON DELETE RESTRICT`.
 - `unit_price >= 0`, `current_stock >= 0`, `reorder_level >= 0`, and `quantity > 0`.
-- Movement type restricted to `STOCK_IN` or `STOCK_OUT`.
-- Category deletion is rejected while products reference it.
-- Product deletion is rejected while movement history exists. The service should also check this to return a useful API error.
-- `updated_at` must be updated by application logic or a database trigger; a default alone does not update it on subsequent updates.
+- Movement type is restricted to `STOCK_IN` or `STOCK_OUT`.
+- Category deletion is rejected while products reference the category.
+- Product deletion is rejected while movement history exists.
+- `updated_at` must be updated by application logic or a database trigger; a default alone does not update it after subsequent changes.
+
+These are the design requirements. Confirm actual database constraints and behavior with PostgreSQL-backed integration tests before treating them as database-verified.
 
 ## 5. Indexes
 
 - Unique indexes are created by the unique constraints on `categories.name` and `products.sku`.
 - `products(category_id)` for category filtering and joins.
-- `products(name)` only if search/query patterns justify it; for basic substring search, choose an appropriate PostgreSQL search strategy only if needed.
-- `products(current_stock, reorder_level)` may help low-stock queries, but the predicate `current_stock <= reorder_level` compares two columns and may not benefit from a simple composite index. Add a specialized solution only after checking actual query plans.
+- Add a `products(name)` search index only if query patterns and measurements justify it.
+- A simple index on `(current_stock, reorder_level)` may not optimize `current_stock <= reorder_level` because the predicate compares two columns.
 - `inventory_movements(product_id, created_at DESC)` for per-product history.
 - `inventory_movements(created_at DESC)` for global newest-first history.
 
@@ -85,6 +87,7 @@ Avoid adding indexes without a query pattern that justifies them.
 ### Stock-in
 
 Within one database transaction:
+
 1. Increment `products.current_stock` by the positive quantity.
 2. Insert one `STOCK_IN` movement row.
 3. Commit only if both operations succeed; otherwise roll back.
@@ -92,12 +95,13 @@ Within one database transaction:
 ### Stock-out
 
 Within one database transaction:
+
 1. Atomically decrement stock only if sufficient stock remains, or lock the product row before checking and updating.
-2. If stock is insufficient, reject the operation without changing stock or history.
+2. Reject insufficient stock without changing stock or history.
 3. Insert one `STOCK_OUT` movement row.
 4. Commit only if both operations succeed; otherwise roll back.
 
-Do not implement stock-out as an unprotected read-then-write sequence; concurrent requests could otherwise oversell stock.
+Do not implement stock-out as an unprotected read-then-write sequence. Concurrent requests could otherwise oversell stock. The current mocked service tests do not establish PostgreSQL rollback or concurrent-request behavior; see [`testing-strategy.md`](testing-strategy.md).
 
 ## 7. Data Types and Defaults
 
@@ -106,32 +110,25 @@ Do not implement stock-out as an unprotected read-then-write sequence; concurren
 - Use `TIMESTAMPTZ` for timestamps.
 - Use database/application-generated UUIDs consistently.
 - Use `CURRENT_TIMESTAMP` for creation timestamps.
-- Define whether UUID generation is application-side or database-side during implementation; do not assume a PostgreSQL UUID extension is enabled without checking.
+- Define UUID generation during implementation; do not assume a PostgreSQL UUID extension is enabled without checking.
 
 ## 8. Schema Setup and Migrations
 
 - Keep database provisioning separate from schema creation.
 - Register ORM models before schema creation/migration.
-- Use migrations if the selected ORM setup supports a migration workflow; review generated migrations before applying them.
+- Keep schema changes and migrations in Git.
+- Review generated migrations before applying them.
 - Never run destructive schema operations automatically against an existing database.
-- Keep schema/migration changes in Git.
-- No seed data is required for the MVP; optional demo categories/products must be clearly identified as sample data.
+- No seed data is required; optional demo records must be clearly identified as sample data.
 
-## 9. Decisions Deferred
+## 9. Deferred Decisions
 
-- Whether product deletion should be replaced with soft deletion in a later version.
-- Whether inventory adjustments beyond stock-in/stock-out are required.
-- Whether stock movement needs an actor/user reference once authentication is introduced.
-- Whether product name search needs full-text/trigram indexing.
-- Whether stock balance should eventually be derived from movements rather than stored in `products.current_stock`.
+- Whether product deletion should be replaced with soft deletion.
+- Whether stock adjustments beyond stock-in/stock-out are required.
+- Whether movements should reference an actor/user if authentication is introduced.
+- Whether product search needs full-text or trigram indexing.
+- Whether stock balance should eventually be derived from movements rather than stored on `products`.
 
-## 10. Design Verification Checklist
+## 10. Verification Status
 
-- [ ] Entity attributes match the approved MVP requirements.
-- [ ] Primary and foreign keys are represented in ORM models.
-- [ ] Unique and CHECK constraints are present.
-- [ ] Delete behavior preserves movement history.
-- [ ] Stock changes and movement insertion share a transaction.
-- [ ] Concurrent stock-out operations cannot make stock negative.
-- [ ] Indexes correspond to actual list/history query patterns.
-- [ ] Migration/schema creation succeeds on a clean database.
+The model and transaction rules are documented. PostgreSQL-backed integration tests are deferred; do not treat constraints, transaction rollback, or concurrent stock-out guarantees as independently verified by the mocked service suite.
