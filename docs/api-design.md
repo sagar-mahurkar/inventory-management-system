@@ -1,10 +1,12 @@
-# Inventory Management System API Design
+# Inventory Management System — API Design
+
+## Base Path and Scope
 
 Base path: `/api/v1`. Authentication is excluded from the approved MVP.
 
-## Response conventions
+## Response Conventions
 
-Successful resource responses use `{ "data": ... }`. List endpoints return pagination metadata alongside the items. Errors use the existing API error format:
+Successful resource responses use a `data` envelope. List endpoints include pagination metadata alongside the items. Errors use the common API error format:
 
 ```json
 {
@@ -41,7 +43,7 @@ Supported query parameters: `category_id`, `search`, `low_stock=true|false`, `li
 
 `current_stock` is not editable through product create/update requests. New products start at zero stock; stock changes are recorded through inventory movements.
 
-## Inventory movements
+## Inventory Movements
 
 | Method | Path | Purpose | Success |
 |---|---|---|---:|
@@ -50,24 +52,28 @@ Supported query parameters: `category_id`, `search`, `low_stock=true|false`, `li
 
 Supported query parameters: `product_id`, `movement_type`, `limit`, and `offset`. `movement_type` must be `STOCK_IN` or `STOCK_OUT`; quantity must be a positive integer.
 
-Stock updates and movement insertion execute in one database transaction. A product row is locked during the operation, and stock-out is rejected if the available balance is insufficient. Failed operations must not change stock or create a movement record.
+Stock updates and movement insertion are intended to execute in one database transaction. The product row is locked during the operation, and stock-out is rejected if available stock is insufficient. Failed operations must not change stock or create a movement record. PostgreSQL-backed integration verification is deferred; see [`testing-strategy.md`](testing-strategy.md).
 
-## Summary and aggregation
+## Summary and Aggregation
 
 | Method | Path | Purpose | Success |
 |---|---|---|---:|
-| GET | `/summary` | Return category/product counts, total units in stock, total inventory value, low-stock product count, and out-of-stock product count | 200 |
+| GET | `/summary` | Return category/product counts, total units in stock, total inventory value, low-stock count, and out-of-stock count | 200 |
 | GET | `/summary/movements` | Return movement counts and total quantities for stock-in and stock-out | 200 |
 
-The summary endpoints are read-only. Aggregation queries are implemented in the repository layer and exposed through the service/controller layers. Counts and quantities are returned as numbers. `total_inventory_value` is returned as a decimal string to avoid JavaScript floating-point precision loss. Empty tables return zero-valued aggregates.
+Summary endpoints are read-only. Aggregation logic belongs in repository/service layers, not routes. Counts and quantities are returned as numbers. `total_inventory_value` is returned as a decimal string to avoid JavaScript floating-point precision loss. Empty tables should return zero-valued aggregates.
 
-## Common status codes
+## Common Status Codes
 
 - `400` — invalid input or invalid category reference
 - `404` — category or product not found
 - `409` — duplicate category name/SKU, category in use, product with movement history, or insufficient stock
 - `500` — unexpected server error
 
-## Scope exclusions
+## Scope Exclusions
 
-No authentication, user accounts, warehouses, suppliers, or orders are introduced by these endpoints.
+These endpoints do not introduce authentication, user accounts, warehouses, suppliers, or orders.
+
+## Contract Maintenance
+
+This document describes the intended API contract. When implementation changes, update this document and the relevant tests together. Verify endpoint paths, response envelopes, status codes, and query parameter names against the source before extending the API.
