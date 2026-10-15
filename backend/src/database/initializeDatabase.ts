@@ -9,7 +9,7 @@ function quotePostgresIdentifier(identifier: string): string {
 
 /**
  * Creates the configured application database if it does not exist, then
- * initializes the application's TypeORM connection. It does not create tables.
+ * initializes TypeORM and applies any pending, versioned schema migrations.
  *
  * The configured database user must have permission to CREATE DATABASE.
  */
@@ -44,7 +44,23 @@ export async function initializeDatabase(): Promise<void> {
     await adminClient.end();
   }
 
-  // synchronize is disabled; no tables or schema are created in this phase.
   await dataSource.initialize();
   console.info("Application database connection established.");
+
+  try {
+    const appliedMigrations = await dataSource.runMigrations({ transaction: "all" });
+
+    if (appliedMigrations.length > 0) {
+      console.info(
+        `Applied ${appliedMigrations.length} database migration(s): ${appliedMigrations
+          .map((migration) => migration.name)
+          .join(", ")}`,
+      );
+    } else {
+      console.info("Database schema is up to date.");
+    }
+  } catch (error) {
+    await dataSource.destroy();
+    throw error;
+  }
 }

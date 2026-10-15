@@ -5,6 +5,7 @@ import { env, getDatabaseConfig } from "../config/env";
 import { Category } from "../entities/Category";
 import { InventoryMovement } from "../entities/InventoryMovement";
 import { Product } from "../entities/Product";
+import { InitialInventorySchema1792020000000 } from "./migrations/InitialInventorySchema1792020000000";
 
 const databaseConfig = getDatabaseConfig();
 
@@ -18,9 +19,8 @@ export const dataSource = new DataSource({
   synchronize: false,
   logging: false,
   entities: [Category, Product, InventoryMovement],
-  migrations: [],
+  migrations: [InitialInventorySchema1792020000000],
   subscribers: [],
-  // Keep schema changes explicit; database provisioning does not create tables.
   migrationsRun: false,
 });
 
